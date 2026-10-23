@@ -1,0 +1,50 @@
+# Development stack: bind-mounted source and auto-reload.
+#
+# This file is NOT production. It mounts the working tree over the image's
+# code and runs uvicorn with --reload, which is what makes editing a file take
+# effect immediately and also what makes it unsuitable for a deploy.
+# For production use docker-compose.prod.yml on its own — it is standalone,
+# not an override, because Compose merges volume lists by target rather than
+# replacing them, so layering would keep the bind mounts and --reload:
+#
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Migrations are never run from here. See the `migrate` service in the prod
+# override, and the deployment section of the README.
+services:
+  api:
+    build:
+      context: .
+      target: api
+    container_name: amp-api
+    env_file: .env
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+    ports:
+      - "8000:8000"
+    volumes:
+      # Live reload during development; the prod override removes these.
+      - ./app:/srv/app:ro
+      - ./alembic:/srv/alembic:ro
+    command: >
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      target: dashboard
+    container_name: amp-dashboard
+    env_file: .env
+    environment:
+      # The dashboard talks to the API over HTTP, by service name inside the
+      # compose network. It is the only wiring between the two.
+      API_BASE_URL: ${API_BASE_URL:-http://api:8000}
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./dashboard:/srv/dashboard:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

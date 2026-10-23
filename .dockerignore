@@ -1,0 +1,30 @@
+.git
+.gitignore
+.github
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+htmlcov
+.coverage
+.env
+.env.*
+!.env.example
+# Streamlit reads secrets.toml out of a .streamlit directory beside the app.
+# Nothing creates one today, but if someone ever does it must not be able to
+# ride into an image layer.
+.streamlit
+**/.streamlit
+*.log
+tests
+*.md
+!README.md
+.vscode
+.idea
+.claude
+Makefile
+docker-compose*.yml
+Dockerfile

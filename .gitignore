@@ -179,3 +179,16 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+# ---- Project-specific ----
+.env.local
+.env.*.local
+!.env.example
+.streamlit/secrets.toml
+.ruff_cache/
+*.db
+*.sqlite3
+logs/
+*.log
+.DS_Store
+.vscode/
+.idea/

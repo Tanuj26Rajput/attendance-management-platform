@@ -1,0 +1,89 @@
+# Production stack.
+#
+# Standalone, not an override. Compose merges volume lists by target rather
+# than replacing them, so layering this on top of docker-compose.yml would
+# quietly keep that file's bind mounts and --reload -- the two things a
+# deploy must not have. Run it on its own:
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Migrations are a separate, explicit step. The `migrate` service sits behind
+# a profile so it is never started by `up`, which is what keeps every API
+# replica from racing to run `alembic upgrade head` against the same database:
+#
+#   docker compose -f docker-compose.prod.yml --profile migrate run --rm migrate
+#
+# Secrets come from the environment at runtime, never from the image. .env is
+# excluded by .dockerignore and is read by the Docker CLI on the host, not
+# baked into any layer.
+services:
+  api:
+    build:
+      context: .
+      target: api
+    image: amp-api:${IMAGE_TAG:-latest}
+    # No container_name: it would prevent `--scale api=N`.
+    env_file: .env
+    environment:
+      APP_ENV: prod
+      DEBUG: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      # Which proxies may set X-Forwarded-For. Leave unset when nothing sits
+      # in front of the container: uvicorn then trusts only 127.0.0.1, so a
+      # forged header cannot put a false IP in the audit trail.
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1}
+    ports:
+      # Bound to loopback: terminate TLS and serve the public port from a
+      # reverse proxy on the host rather than exposing uvicorn directly.
+      - "127.0.0.1:8000:8000"
+    # The image's HEALTHCHECK already probes /api/v1/health.
+    # Long enough for in-flight requests to drain; matches uvicorn's
+    # --timeout-graceful-shutdown so Docker does not SIGKILL mid-drain.
+    stop_grace_period: 35s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  dashboard:
+    build:
+      context: .
+      target: dashboard
+    image: amp-dashboard:${IMAGE_TAG:-latest}
+    env_file: .env
+    environment:
+      APP_ENV: prod
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # The only coupling between the two services, and it is configurable.
+      API_BASE_URL: ${API_BASE_URL:-http://api:8000}
+    ports:
+      - "127.0.0.1:8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    stop_grace_period: 15s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # ---------------------------------------------------------------- migrate
+  # One-shot, profile-gated, and deliberately not part of `up`. Run it once
+  # per deploy, before rolling the API, and wait for it to exit 0.
+  migrate:
+    build:
+      context: .
+      target: api
+    image: amp-api:${IMAGE_TAG:-latest}
+    env_file: .env
+    environment:
+      APP_ENV: prod
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: ["alembic", "upgrade", "head"]
+    profiles: ["migrate"]
+    restart: "no"

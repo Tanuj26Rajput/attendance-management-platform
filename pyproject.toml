@@ -1,0 +1,44 @@
+[project]
+name = "attendance-management-platform"
+version = "0.1.0"
+description = "AI-powered attendance management platform"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+# One event loop for the whole session. The database engine is session-scoped
+# so the (slow, ~3s against a hosted database) connection handshake is paid
+# once rather than per test; asyncpg connections are bound to the loop that
+# created them, so fixtures and tests must share that loop.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+addopts = "-q --strict-markers -m 'not integration'"
+markers = [
+  "integration: requires a live database or external service",
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["*/__init__.py", "alembic/*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+ignore = ["B008"]  # FastAPI's Depends() in defaults is idiomatic
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]
+
+[tool.mypy]
+# No python_version pin: mypy follows the running interpreter, so the
+# checked syntax level always matches the installed dependency stubs.
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+warn_unused_ignores = false
+exclude = ["alembic/versions"]
