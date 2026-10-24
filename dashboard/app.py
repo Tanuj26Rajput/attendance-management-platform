@@ -13,6 +13,16 @@ a 403 they could not have done anything with.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Streamlit Cloud runs `streamlit run dashboard/app.py` directly, which only
+# puts this file's own directory on sys.path, not the repo root -- so the
+# sibling `dashboard` package import below fails unless we add it ourselves.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 import streamlit as st
 
 from dashboard import session
