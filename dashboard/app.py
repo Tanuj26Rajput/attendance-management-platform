@@ -25,6 +25,10 @@ if str(_REPO_ROOT) not in sys.path:
 
 import streamlit as st
 
+from dashboard._bootstrap_api import ensure_api_running
+
+ensure_api_running()
+
 from dashboard import session
 from dashboard.api_client import DEFAULT_BASE_URL
 from dashboard.views import admin_audit, admin_directory, admin_reports, assistant
